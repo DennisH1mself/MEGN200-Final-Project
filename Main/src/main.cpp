@@ -9,12 +9,13 @@
 // END INCLUDES
 
 // SETTINGS
-const bool GPSEnabled = false;
-const bool UltrasonicEnabled = false;
+const bool GPSEnabled = true;
+const bool UltrasonicEnabled = true;
 const bool MotorEnabled = true;
 const bool ServoEnabled = true;
 const bool WiFiEnabled = true;
 const bool SerialEnabled = true;
+const bool RadarEnabled = true;
 #define BAUD_RATE 9600
 
 #define SECRET_SSID "DennisNet"
@@ -24,18 +25,20 @@ IPAddress IP_Address(192, 48, 56, 2);
 // END SETTINGS
 
 // PIN DEFINITIONS
-#define GPS_RX_PIN 10
-#define GPS_TX_PIN 11
 #define SERVO_PIN 9
+#define RADAR_PIN 10
 #define MOTOR_PIN 6
 #define TRIG_PIN 2
 #define ECHO_PIN 3
 #define GPS_BAUD 9600
+#define radarWaitTime 60
+#define radarMoveAngle 3
+#define radarPowerPin 12
 // END PIN DEFINITIONS
 
 // INITIALIZE
 Servo servoMotor;
-SoftwareSerial gpsSerial(GPS_RX_PIN, GPS_TX_PIN);
+Servo radarMotor;
 TinyGPSPlus gps;
 WiFiServer server(PORT);
 // END INITIALIZE
@@ -44,8 +47,12 @@ WiFiServer server(PORT);
 int servoAngle = 0;
 int motorSpeed = 0;
 long distance = 0;
+int radarAngle = 0;
+long radarLastMove = 0;
 long duration = 0;
 int status = WL_IDLE_STATUS;
+float latitude = 0;
+float longitude = 0;
 // END VARIABLES
 
 // HTTP HANDLERS
@@ -66,6 +73,7 @@ public:
     response += "Content-Type: " + contentType + "\r\n";
     response += "Content-Length: " + String(body.length()) + "\r\n";
     response += "Connection: close\r\n\r\n";
+    // response += "Access-Control-Allow-Origin: *\r\n\r\n";
     response += body;
     return response;
   }
@@ -124,11 +132,15 @@ public:
 void initializeSerial();
 void initializeMotors();
 void initializeUltrasonic();
+void initializeRadar();
 void initializeWiFi();
 void initializeGPS();
 
+void updateGPS();
 void updateDistance();
+void updateRadar();
 void setServoAngle(int angle);
+void setRadarAngle(int angle);
 void setMotorSpeed(int speed);
 void checkFirmwareVersion();
 
@@ -148,10 +160,14 @@ void setup()
     initializeMotors();
   if (ServoEnabled)
     servoMotor.attach(SERVO_PIN);
-  if (UltrasonicEnabled)
-    initializeUltrasonic();
+  
   if (GPSEnabled)
     initializeGPS();
+  if (RadarEnabled){
+    initializeRadar();
+    if (UltrasonicEnabled)
+      initializeUltrasonic();
+  }
 
   Serial.println("Setup complete.");
   // delay(1000); // Allow time for setup to complete
@@ -164,18 +180,13 @@ void loop()
     checkStatus();
     checkForClient();
   }
-  if (GPSEnabled && gpsSerial.available())
-  {
-    while (gpsSerial.available())
-      gps.encode(gpsSerial.read());
-    if (gps.location.isUpdated())
-    {
-      Serial.print("Latitude: ");
-      Serial.print(gps.location.lat(), 6);
-      Serial.print(", Longitude: ");
-      Serial.println(gps.location.lng(), 6);
-    }
+  if (RadarEnabled) {
+    updateRadar();
   }
+  /*if (GPSEnabled)
+  {
+    updateGPS();
+  }*/
 }
 // END MAIN FUNCTIONS
 
@@ -195,6 +206,8 @@ void initializeMotors()
   pinMode(MOTOR_PIN, OUTPUT);
   Serial.println("Motors initialized.");
 }
+
+
 
 void initializeUltrasonic()
 {
@@ -225,8 +238,68 @@ void initializeWiFi()
 
 void initializeGPS()
 {
-  gpsSerial.begin(GPS_BAUD);
+  Serial1.begin(GPS_BAUD);
   Serial.println("GPS initialized.");
+}
+
+void initializeRadar()
+{
+  pinMode(radarPowerPin, OUTPUT);
+  digitalWrite(radarPowerPin, HIGH); // Power on the radar
+  radarMotor.attach(RADAR_PIN);
+  setRadarAngle(0); // Initialize radar to 0 degrees
+  Serial.println("Radar initialized.");
+}
+
+void updateGPS()
+{
+  if (Serial1.available() == 0)
+  {
+    latitude = -1;
+    longitude = -1;
+    return;
+  }
+  while (Serial1.available() > 0)
+  {
+    gps.encode(Serial1.read());
+    if (gps.location.isValid())
+    {
+      latitude = gps.location.lat();
+      longitude = gps.location.lng();
+      /*Serial.print("Latitude: ");
+      Serial.print(latitude, 6);
+      Serial.print(", Longitude: ");
+      Serial.println(longitude, 6);*/
+      break;
+    } /*else
+    {
+      latitude = -1;
+      longitude = -1;
+      break;
+    }*/
+  }
+  
+}
+
+void updateRadar() {
+  long currentMillis = millis();
+  if (currentMillis - radarLastMove >= radarWaitTime) {
+    radarLastMove = currentMillis;
+    radarAngle += radarMoveAngle;
+    if (radarAngle > 180) {
+      radarAngle = 0;
+      radarLastMove += radarWaitTime*3; // Adjust the last move time to avoid immediate next move
+    }
+    setRadarAngle(radarAngle);
+  }
+  if (UltrasonicEnabled) {
+    updateDistance();
+    Serial.print("Distance: ");
+    Serial.print(distance);
+    
+    Serial.print(" cm at angle: ");
+    Serial.println(radarAngle);
+  }
 }
 
 void updateDistance()
@@ -242,14 +315,40 @@ void updateDistance()
 
 void setServoAngle(int angle)
 {
+  if (angle < 0) {
+    angle = 0;
+  }
+  else if (angle > 180) {
+    angle = 180;
+  }
   servoMotor.write(angle);
   servoAngle = angle;
   /*Serial.print("Servo angle set to: ");
   Serial.println(servoAngle);*/
 }
 
+void setRadarAngle(int angle)
+{
+  if (angle < 0) {
+    angle = 0;
+  }
+  else if (angle > 180) {
+    angle = 180;
+  }
+  radarMotor.write(angle);
+  radarAngle = angle;
+  /*Serial.print("Radar angle set to: ");
+  Serial.println(radarAngle);*/
+}
+
 void setMotorSpeed(int speed)
 {
+  if (speed < 0) {
+    speed = 0;
+  }
+  else if (speed > 255) {
+    speed = 255;
+  }
   analogWrite(MOTOR_PIN, speed);
   motorSpeed = speed;
   /*Serial.print("Motor speed set to: ");
@@ -267,10 +366,7 @@ void checkFirmwareVersion()
 
 void respondToClient(WiFiClient &client, const HttpRequest &request)
 {
-  Serial.print("Received request: ");
-  Serial.print(request.method);
-  Serial.print(" at ");
-  Serial.println(request.path);
+  Serial.println(request.rawData);
   bool sendResponse = true;
   HttpResponse response;
   if (request.method == "GET")
@@ -280,14 +376,18 @@ void respondToClient(WiFiClient &client, const HttpRequest &request)
       String panelContent = String(htmlContent.c_str());
       response = HttpResponse(200, "OK", "text/html", panelContent);
     }*/
-    if (request.path == "/control/distance") {
-      if (!UltrasonicEnabled) {
+    if (request.path == "/control/distance")
+    {
+      if (!UltrasonicEnabled)
+      {
         JsonDocument jsonResponse;
         jsonResponse["distance"] = -1;
         String jsonResponseStr;
         serializeJson(jsonResponse, jsonResponseStr);
         response = HttpResponse(200, "OK", "application/json", jsonResponseStr);
-      } else {
+      }
+      else
+      {
         updateDistance();
         JsonDocument jsonResponse;
         jsonResponse["distance"] = distance;
@@ -296,35 +396,58 @@ void respondToClient(WiFiClient &client, const HttpRequest &request)
         response = HttpResponse(200, "OK", "application/json", jsonResponseStr);
       }
     }
-  } else if (request.method == "POST") {
-    sendResponse = false;
+    else if (request.path == "/control/location") {
+      if (!GPSEnabled)
+      {
+        JsonDocument jsonResponse;
+        jsonResponse["latitude"] = -1;
+        jsonResponse["longitude"] = -1;
+        String jsonResponseStr;
+        serializeJson(jsonResponse, jsonResponseStr);
+        response = HttpResponse(200, "OK", "application/json", jsonResponseStr);
+      }
+      else
+      {
+        // Serial.println("Updating GPS...");
+        updateGPS();
+        JsonDocument jsonResponse;
+        jsonResponse["latitude"] = latitude;
+        jsonResponse["longitude"] = longitude;
+        String jsonResponseStr;
+        serializeJson(jsonResponse, jsonResponseStr);
+        response = HttpResponse(200, "OK", "application/json", jsonResponseStr);
+        response.body = jsonResponseStr; // Ensure body matches Content-Length
+        Serial.println("GPS updated.");
+      }
+    }
+  }
+  else if (request.method == "POST")
+  {
     if (request.path == "/control/motor")
     {
       int motorValue = request.body["motor"];
       setMotorSpeed(motorValue);
+      response = HttpResponse(200, "OK", "application/json", "{\"status\":\"success\"}");
     }
     else if (request.path == "/control/servo")
     {
       int servoValue = request.body["servo"];
       setServoAngle(servoValue);
+      response = HttpResponse(200, "OK", "application/json", "{\"status\":\"success\"}");
     }
-    
-  } else {
+  }
+  else
+  {
     response = HttpResponse(404, "Not Found", "text/plain", "404 Not Found");
   }
-  
-  if (sendResponse) {
-    String responseString = response.toString();
-    client.print(responseString);
-  }
-  
-  /*Serial.println("Request Sent");
+
   if (sendResponse)
   {
+    String responseString = response.toString();
     client.print(responseString);
-    client.flush();
+    /*Serial.println("Response sent:");
+    Serial.println(responseString);*/
   }
-  Serial.println("Response Received");*/
 }
 
 void checkStatus()
