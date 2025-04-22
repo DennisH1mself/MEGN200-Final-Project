@@ -3,7 +3,7 @@
 #include <Servo.h>
 #include "WiFiS3.h"
 #include "ArduinoJson.h"
-#include "html.h"
+// #include "html.h"
 #include <TinyGPS++.h>
 #include <SoftwareSerial.h>
 // END INCLUDES
@@ -275,16 +275,46 @@ void respondToClient(WiFiClient &client, const HttpRequest &request)
   HttpResponse response;
   if (request.method == "GET")
   {
-    if (request.path == "/panel/")
+    /*if (request.path == "/panel/")
     {
       String panelContent = String(htmlContent.c_str());
       response = HttpResponse(200, "OK", "text/html", panelContent);
+    }*/
+    if (request.path == "/control/distance") {
+      if (!UltrasonicEnabled) {
+        JsonDocument jsonResponse;
+        jsonResponse["distance"] = -1;
+        String jsonResponseStr;
+        serializeJson(jsonResponse, jsonResponseStr);
+        response = HttpResponse(200, "OK", "application/json", jsonResponseStr);
+      } else {
+        updateDistance();
+        JsonDocument jsonResponse;
+        jsonResponse["distance"] = distance;
+        String jsonResponseStr;
+        serializeJson(jsonResponse, jsonResponseStr);
+        response = HttpResponse(200, "OK", "application/json", jsonResponseStr);
+      }
     }
+  } else if (request.method == "POST") {
+    sendResponse = false;
+    if (request.path == "/control/motor")
+    {
+      int motorValue = request.body["motor"];
+      setMotorSpeed(motorValue);
+    }
+    else if (request.path == "/control/servo")
+    {
+      int servoValue = request.body["servo"];
+      setServoAngle(servoValue);
+    }
+    
+  } else {
+    response = HttpResponse(404, "Not Found", "text/plain", "404 Not Found");
   }
+  
   if (sendResponse) {
-    char * responseString = (char *)malloc(response.toString().length() + 1);
-    strcpy(responseString, response.toString().c_str());
-    Serial.println(responseString);
+    String responseString = response.toString();
     client.print(responseString);
   }
   
