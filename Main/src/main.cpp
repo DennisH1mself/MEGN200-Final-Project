@@ -10,12 +10,12 @@
 
 // SETTINGS
 const bool GPSEnabled = true;
-const bool UltrasonicEnabled = true;
+const bool UltrasonicEnabled = false;
 const bool MotorEnabled = true;
 const bool ServoEnabled = true;
 const bool WiFiEnabled = true;
 const bool SerialEnabled = true;
-const bool RadarEnabled = true;
+const bool RadarEnabled = false;
 #define BAUD_RATE 9600
 
 #define SECRET_SSID "DennisNet"

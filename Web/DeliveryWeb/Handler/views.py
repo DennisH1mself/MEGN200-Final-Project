@@ -7,11 +7,13 @@ from django.conf import settings
 # Create your views here.
 @csrf_exempt
 def setMotorSpeed(request: HttpRequest):
+    print('MTORO SPEED VECIEVER')
     if request.method == 'POST':
         # Get the speed from the request body
         speed = int(json.loads(request.body).get('motor', 0))
         try:
-            requests.post(settings.BOT_ADDRESS + '/control/motor', json={'motor': speed})
+            print('ATTEMPTING SEND')
+            requests.post(settings.BOT_ADDRESS + '/control/motor', json={'motor': speed}, timeout=3)
         except:
             pass
         return HttpResponse(status=200)
