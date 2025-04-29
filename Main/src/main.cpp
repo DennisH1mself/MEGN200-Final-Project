@@ -320,8 +320,9 @@ void setServoAngle(int angle)
   }
   else if (angle > 180) {
     angle = 180;
-  }
+  }  
   servoMotor.write(angle);
+  delay(15); // Allow time for the servo to reach the position
   servoAngle = angle;
   /*Serial.print("Servo angle set to: ");
   Serial.println(servoAngle);*/

@@ -7,8 +7,19 @@ from django.conf import settings
 # Create your views here.
 @csrf_exempt
 def setMotorSpeed(request: HttpRequest):
-    print('MTORO SPEED VECIEVER')
+    print('MOTOR SPEED RECIEVED')
     if request.method == 'POST':
+        # Get the speed from the request body
+        speed = 255 if int(json.loads(request.body).get('motor', 0)) == 1 else 0
+        try:
+            # Send the speed to the bot's motor control endpoint
+            requests.post(settings.BOT_ADDRESS + '/control/motor', json={'motor': speed})
+        except:
+            pass
+        return HttpResponse(status=200)
+    else:
+        return HttpResponse("Invalid request method", status=405)
+    """if request.method == 'POST':
         # Get the speed from the request body
         speed = int(json.loads(request.body).get('motor', 0))
         try:
@@ -18,7 +29,7 @@ def setMotorSpeed(request: HttpRequest):
             pass
         return HttpResponse(status=200)
     else:
-        return HttpResponse("Invalid request method", status=405)
+        return HttpResponse("Invalid request method", status=405)"""
     
 @csrf_exempt
 def setServoAngle(request: HttpRequest):

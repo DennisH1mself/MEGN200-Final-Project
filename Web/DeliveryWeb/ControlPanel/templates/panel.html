@@ -67,6 +67,80 @@
             display: flex;
             gap: 15px;
         }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        /* Hide default HTML checkbox */
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .switchslider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+        }
+
+        .switchslider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            -webkit-transition: .4s;
+            transition: .4s;
+        }
+
+        input:checked+.switchslider {
+            background-color: #2196F3;
+        }
+
+        input:focus+.switchslider {
+            box-shadow: 0 0 1px #2196F3;
+        }
+
+        input:checked+.switchslider:before {
+            -webkit-transform: translateX(26px);
+            -ms-transform: translateX(26px);
+            transform: translateX(26px);
+        }
+
+        /* Rounded sliders */
+        .switchslider.round {
+            border-radius: 34px;
+        }
+
+        .switchslider.round:before {
+            border-radius: 50%;
+        }
+
+        .deliver-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .deliver-button:hover {
+            background-color: #78967a;
+        }
     </style>
 </head>
 
@@ -77,10 +151,10 @@
     <div class="content">
         <div class="control">
             <p>DC Motor Power Control</p>
-            <div class="slider-c">
-                <input type="range" min="0" max="255" value="0" class="slider" id="motor">
-                <p style="font-weight: 100 !important; font-size: medium !important;" id="motor-speed">0</p>
-            </div>
+            <label class="switch">
+                <input type="checkbox" id="motor-switch">
+                <span class="switchslider round"></span>
+            </label>
         </div>
         <div class="control">
             <p>Servo Angle Control</p>
@@ -89,17 +163,117 @@
                 <p style="font-weight: 100 !important; font-size: medium !important;" id="servo-speed">0</p>
             </div>
         </div>
-        <div class="control">
+        <!--<div class="control">
             <p>Ultrasonic Distance</p>
             <p style="font-size: x-large; font-weight: 100;"><span id="distance">0</span> cm</p>
-        </div>
+        </div>-->
         <div class="control">
             <p>Location</p>
             <p style="font-size: x-large; font-weight: 100;"><span id="long">0</span>, <span id="lat">0</span></p>
         </div>
+        <div class="control">
+            <p>Delivery Manager</p>
+            <input type="text" id="delivery-id" placeholder="Enter Delivery Location"
+                style="margin-top: 10px; width: 200px; padding: 10px; border-radius: 5px; border: 1px solid #ccc; margin-bottom: 10px; text-align: center; color: white">
+            <div id="map" style="width: 100%; height: 200px; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc;"></div>
+            <script
+                src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDImSh7OZ9hL_iLAMeNhdBtniuDT3cVTjY&callback=initMap"
+                defer>
+            </script>
+            <script>
+                let map;
+                let directionsService;
+                let directionsRenderer;
+
+                function initMap() {
+                    const initialLocation = { lat: 0, lng: 0 }; // Default location
+                    map = new google.maps.Map(document.getElementById("map"), {
+                        center: initialLocation,
+                        zoom: 15,
+                    });
+                    directionsService = new google.maps.DirectionsService();
+                    directionsRenderer = new google.maps.DirectionsRenderer();
+                    directionsRenderer.setMap(map);
+                }
+
+                function showDirections(lat, lng, address) {
+                    if (!lat || !lng || !address) {
+                        directionsRenderer.set('directions', null); // Clear directions if no data
+                        return;
+                    }
+
+                    const origin = { lat: parseFloat(lat), lng: parseFloat(lng) };
+                    directionsService.route(
+                        {
+                            origin: origin,
+                            destination: address,
+                            travelMode: google.maps.TravelMode.DRIVING,
+                        },
+                        (response, status) => {
+                            if (status === google.maps.DirectionsStatus.OK) {
+                                directionsRenderer.setDirections(response);
+                            } else {
+                                console.error("Directions request failed due to " + status);
+                            }
+                        }
+                    );
+                }
+
+                document.getElementById("delivery-id").addEventListener("change", function () {
+                    const deliveryLocation = this.value;
+                    const xhr = new XMLHttpRequest();
+                    xhr.open("GET", `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(deliveryLocation)}&key=AIzaSyDImSh7OZ9hL_iLAMeNhdBtniuDT3cVTjY`, true);
+                    xhr.onreadystatechange = function () {
+                        if (xhr.readyState === XMLHttpRequest.DONE) {
+                            if (xhr.status === 200) {
+                                const response = JSON.parse(xhr.responseText);
+                                if (response.results && response.results.length > 0) {
+                                    const address = response.results[0].formatted_address;
+                                    const lat = document.getElementById("lat").innerText;
+                                    const lng = document.getElementById("long").innerText;
+                                    showDirections(lat, lng, address);
+                                } else {
+                                    console.error("No results found for the given location.");
+                                }
+                            } else {
+                                console.error("Error fetching geocode data:", xhr.statusText);
+                            }
+                        }
+                    };
+                    xhr.send();
+                });
+
+                // Initialize map after the script loads
+                window.onload = initMap;
+
+                // Update directions periodically with current location
+                let previousLat = "39.74893";
+                let previousLng = "-105.2209";
+
+                setInterval(() => {
+                    const lat = document.getElementById("lat").innerText;
+                    const lng = document.getElementById("long").innerText;
+                    const deliveryLocation = document.getElementById("delivery-id").value;
+
+                    if (lat && lng && deliveryLocation && (lat !== previousLat || lng !== previousLng)) {
+                        if (lat === "-1" && lng === "-1") {
+                            showDirections(previousLat, previousLng, deliveryLocation);
+                            return;
+                        }
+                        previousLat = lat;
+                        previousLng = lng;
+                        showDirections(lat, lng, deliveryLocation);
+                    }
+                }, 5000);
+            </script>
+            <button id="start-delivery" class="deliver-button">Start Delivery</button>
+        </div>
+        <script>
+            
+        </script>
     </div>
     <script>
-        const motorSlider = document.getElementById("motor");
+        /*const motorSlider = document.getElementById("motor");
         const motorValue = document.getElementById("motor-speed");
         motorSlider.addEventListener("input", function () {
             motorValue.innerText = this.value;
@@ -116,6 +290,22 @@
                         console.log("Motor value sent successfully.");
                     } else {
                         console.error("Error sending motor value:", xhr.statusText);
+                    }
+                }
+            };
+        });*/
+        const motorSwitch = document.getElementById("motor-switch");
+        motorSwitch.addEventListener("change", function () {
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "{{ BOT_ADDRESS }}/control/motor", true);
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.send(JSON.stringify({ motor: this.checked ? 1 : 0 }));
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    if (xhr.status === 200) {
+                        console.log("Motor switch value sent successfully.");
+                    } else {
+                        console.error("Error sending motor switch value:", xhr.statusText);
                     }
                 }
             };
@@ -158,7 +348,7 @@
             xhr.send();
         }
 
-        /* function updateLocation() {
+        function updateLocation() {
             const xhr = new XMLHttpRequest();
             xhr.open("GET", "{{ BOT_ADDRESS }}/control/location", true);
             xhr.onreadystatechange = function () {
@@ -174,7 +364,7 @@
             };
             xhr.send();
         }
-        setInterval(updateLocation, 5000);*/ // Update location every second
+        setInterval(updateLocation, 5000); // Update location every second
         // setInterval(updateDistance, 500); // Update distance every second
 
 

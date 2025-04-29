@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 
 BOT_ADDRESS = "http://192.48.56.2"
+MAPS_KEY = "AIzaSyDImSh7OZ9hL_iLAMeNhdBtniuDT3cVTjY"
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
