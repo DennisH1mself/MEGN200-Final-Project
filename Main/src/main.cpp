@@ -315,11 +315,11 @@ void updateDistance()
 
 void setServoAngle(int angle)
 {
-  if (angle < 0) {
-    angle = 0;
+  if (angle < 45) {
+    angle = 30;
   }
-  else if (angle > 180) {
-    angle = 180;
+  else if (angle > 135) {
+    angle = 150;
   }  
   servoMotor.write(angle);
   delay(15); // Allow time for the servo to reach the position
