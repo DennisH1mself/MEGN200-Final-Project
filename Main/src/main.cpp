@@ -266,6 +266,29 @@ void updateGPS()
     {
       latitude = gps.location.lat();
       longitude = gps.location.lng();
+      /*time_t time = gps.time.value();
+      int year = gps.date.year();
+      int month = gps.date.month();
+      int day = gps.date.day();
+      int hour = gps.time.hour();
+      int minute = gps.time.minute();
+      int second = gps.time.second();
+      Serial.print("Date: ");
+      Serial.print(year);
+      Serial.print("-");
+      Serial.print(month);
+      Serial.print("-");
+      Serial.print(day);
+      Serial.print(" Time: ");
+      Serial.print(hour);
+      Serial.print(":");
+      Serial.print(minute);
+      Serial.print(":");
+      Serial.println(second);
+      Serial.print(" Latitude: ");
+      Serial.print(latitude, 6);
+      Serial.print(", Longitude: ");
+      Serial.println(longitude, 6);*
       /*Serial.print("Latitude: ");
       Serial.print(latitude, 6);
       Serial.print(", Longitude: ");
@@ -277,6 +300,7 @@ void updateGPS()
       longitude = -1;
       break;
     }*/
+   Serial.println("GPS data not available. No signal.");
   }
   
 }
@@ -418,6 +442,11 @@ void respondToClient(WiFiClient &client, const HttpRequest &request)
         serializeJson(jsonResponse, jsonResponseStr);
         response = HttpResponse(200, "OK", "application/json", jsonResponseStr);
         response.body = jsonResponseStr; // Ensure body matches Content-Length
+        Serial.print("Latitude: ");
+        Serial.print(latitude, 6);
+        Serial.print(", Longitude: ");
+        Serial.println(longitude, 6);
+
         Serial.println("GPS updated.");
       }
     }
