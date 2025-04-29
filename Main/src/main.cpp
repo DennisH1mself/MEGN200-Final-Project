@@ -259,8 +259,10 @@ void updateGPS()
     longitude = -1;
     return;
   }
+  int runs = 0;
   while (Serial1.available() > 0)
   {
+    runs++;
     gps.encode(Serial1.read());
     if (gps.location.isValid())
     {
@@ -301,6 +303,9 @@ void updateGPS()
       break;
     }*/
    Serial.println("GPS data not available. No signal.");
+   if (runs > 10) {
+    break;
+   }
   }
   
 }
